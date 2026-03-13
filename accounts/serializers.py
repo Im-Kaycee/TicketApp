@@ -59,4 +59,48 @@ class ChangePasswordSerializer(serializers.Serializer):
         if not user.check_password(value):
             raise serializers.ValidationError("Old password is not correct.")
         return value
-    
+
+
+from tickets.paystack import get_banks, create_subaccount
+from rest_framework import serializers
+from .models import User
+
+
+class BankListSerializer(serializers.Serializer):
+    """
+    Serializes the bank list returned from Paystack.
+    Used to populate the bank dropdown on the frontend.
+    """
+    name = serializers.CharField()
+    code = serializers.CharField()
+
+
+class OnboardingSerializer(serializers.Serializer):
+    """
+    Accepts the organizer's bank details during onboarding.
+    Calls Paystack to create a subaccount and stores the code on the user.
+    """
+    account_number = serializers.CharField(max_length=10)
+    bank_code = serializers.CharField(max_length=10)
+    bank_name = serializers.CharField(max_length=100)
+
+    def save(self, user):
+        validated = self.validated_data
+
+        subaccount_code = create_subaccount(
+            business_name=user.get_full_name() or user.username,
+            bank_code=validated["bank_code"],
+            account_number=validated["account_number"],
+            percentage_charge=95.00,  # organizer gets 95%, you keep 5%
+        )
+
+        user.paystack_subaccount_code = subaccount_code
+        user.account_number = validated["account_number"]
+        user.bank_name = validated["bank_name"]
+        user.save(update_fields=[
+            "paystack_subaccount_code",
+            "account_number",
+            "bank_name",
+        ])
+
+        return user

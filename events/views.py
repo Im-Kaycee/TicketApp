@@ -17,9 +17,13 @@ class EventCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
+        if not self.request.user.paystack_subaccount_code:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(
+                {"detail": "You must complete bank account onboarding before creating an event."}
+            )
         event = serializer.save(created_by=self.request.user)
         EventRole.objects.create(user=self.request.user, event=event, role='ORGANIZER')
-
 
 class AddStaffView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
