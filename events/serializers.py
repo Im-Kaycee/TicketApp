@@ -5,7 +5,7 @@ class EventCreationSerializer(serializers.ModelSerializer):
     created_by = serializers.CharField(source='created_by.username', read_only=True)
     class Meta:
         model = Event
-        fields = ['id', 'title', 'description', 'venue', 'event_date', 'capacity', 'created_by']
+        fields = ['id', 'title', 'description', 'venue', 'event_date','price', 'capacity', 'created_by', 'duration_hours', 'created_at']
         read_only_fields = ['id', 'created_by']
 
 class EventRoleSerializer(serializers.ModelSerializer):
