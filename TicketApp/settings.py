@@ -31,7 +31,7 @@ if ENVIRONMENT == 'development':
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 FRONTEND_URL = env('FRONTEND_URL')
 # Password reset token expiration time (in seconds)

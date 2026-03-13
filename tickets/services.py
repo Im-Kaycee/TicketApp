@@ -1,8 +1,7 @@
 from django.db import transaction
-from django.db.models import F
-
 from .models import Order, OrderItem, Ticket
 from .qr import generate_qr_signature
+from .paystack import initialize_transaction
 
 
 class CapacityExceededError(Exception):
@@ -13,17 +12,17 @@ class InvalidQuantityError(Exception):
     pass
 
 
-def purchase_tickets(*, user, event, quantity: int) -> Order:
-
+def initiate_purchase(*, user, event, quantity: int):
+    """
+    Phase 1 — validate capacity, create PENDING order, initialize Paystack payment.
+    Tickets are NOT generated yet. Returns the order and Paystack payment URL.
+    """
     if quantity < 1:
         raise InvalidQuantityError("Quantity must be at least 1.")
 
     with transaction.atomic():
-        # Lock the event row — no other transaction can read-then-write it
-        # until this block commits.
-        from events.models import Event 
-
-        event = Event.objects.select_for_update().get(pk=event.pk)
+        from events.models import Event as EventModel
+        event = EventModel.objects.select_for_update().get(pk=event.pk)
 
         tickets_sold = Ticket.objects.filter(
             event=event,
@@ -40,37 +39,51 @@ def purchase_tickets(*, user, event, quantity: int) -> Order:
                 f"Only {available} ticket(s) remaining for this event."
             )
 
-        # Create the order in PENDING state first.
         order = Order.objects.create(
             buyer=user,
+            event=event,
+            quantity=quantity,
             total_price=event.price * quantity,
             status=Order.Status.PENDING,
         )
 
-        # Generate tickets and attach them to the order.
-        tickets = []
-        order_items = []
+    # Outside the transaction — no need to hold the DB lock during the API call
+    payment_data = initialize_transaction(
+        email=user.email,
+        amount_naira=order.total_price,
+        reference=order.id,
+        subaccount_code=event.created_by.paystack_subaccount_code,
+        platform_fee_percent=event.platform_fee_percent,
+    )
 
-        for _ in range(quantity):
-            ticket = Ticket(
-                event=event,
-                owner=user,
-                status=Ticket.Status.VALID,
-            )
-            ticket.qr_signature = generate_qr_signature(ticket.id)
-            tickets.append(ticket)
+    return order, payment_data["authorization_url"]
 
-        Ticket.objects.bulk_create(tickets)
 
-        for ticket in tickets:
-            order_items.append(
-                OrderItem(order=order, ticket=ticket, price=event.price)
-            )
+def complete_purchase(*, order):
+    """
+    Phase 2 — called by the webhook after Paystack confirms payment.
+    This is where tickets are actually generated.
+    """
+    tickets = []
+    order_items = []
 
-        OrderItem.objects.bulk_create(order_items)
+    for _ in range(order.quantity):
+        ticket = Ticket(
+            event=order.event,
+            owner=order.buyer,
+            status=Ticket.Status.VALID,
+        )
+        ticket.qr_signature = generate_qr_signature(ticket.id)
+        tickets.append(ticket)
 
-        # Mark order complete only after everything succeeded.
-        order.status = Order.Status.COMPLETED
-        order.save(update_fields=["status"])
+    Ticket.objects.bulk_create(tickets)
 
-        return order
+    for ticket in tickets:
+        order_items.append(
+            OrderItem(order=order, ticket=ticket, price=order.event.price)
+        )
+
+    OrderItem.objects.bulk_create(order_items)
+
+    order.status = Order.Status.COMPLETED
+    order.save(update_fields=["status"])

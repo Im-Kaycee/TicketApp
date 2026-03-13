@@ -10,6 +10,7 @@ class Event(models.Model):
     capacity = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  
     duration_hours = models.PositiveIntegerField(default=4)
+    platform_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=5.00)
 
     created_by = models.ForeignKey(
         "accounts.User",

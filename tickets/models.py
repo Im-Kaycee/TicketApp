@@ -49,6 +49,13 @@ class Order(models.Model):
         on_delete=models.PROTECT,
         related_name="orders",
     )
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.PROTECT,
+        related_name="orders",
+        default=1,
+    )
+    quantity = models.PositiveIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(
         max_length=10,
