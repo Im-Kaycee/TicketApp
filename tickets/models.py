@@ -16,8 +16,15 @@ class Ticket(models.Model):
         on_delete=models.PROTECT,
         related_name="tickets",
     )
+    ticket_type = models.ForeignKey(
+        "events.TicketType",
+        on_delete=models.PROTECT,
+        related_name="tickets",
+        null=True,
+        blank=True,
+    )
     owner = models.ForeignKey(
-    "accounts.User",
+        "accounts.User",
         on_delete=models.PROTECT,
         related_name="tickets",
     )
@@ -53,7 +60,13 @@ class Order(models.Model):
         "events.Event",
         on_delete=models.PROTECT,
         related_name="orders",
-        default=1,
+    )
+    ticket_type = models.ForeignKey(
+        "events.TicketType",
+        on_delete=models.PROTECT,
+        related_name="orders",
+        null=True,
+        blank=True,
     )
     quantity = models.PositiveIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -98,4 +111,4 @@ class CheckInLog(models.Model):
         ordering = ["-scanned_at"]
 
     def __str__(self):
-        return f"CheckIn: {self.ticket_id} by {self.scanned_by.username} at {self.scanned_at}"
+        return f"CheckIn: {self.ticket_id} by {self.scanned_by_id} at {self.scanned_at}"

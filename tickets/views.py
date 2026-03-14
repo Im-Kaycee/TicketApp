@@ -26,31 +26,33 @@ from .serializers import (
 from .services import (
     CapacityExceededError,
     InvalidQuantityError,
+    PurchaseLimitExceededError,
     complete_purchase,
     initiate_purchase,
 )
 
 
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
+
+@method_decorator(
+    ratelimit(key="user_or_ip", rate="5/m", method="POST", block=True),
+    name="dispatch"
+)
 class PurchaseTicketsView(APIView):
-    """
-    POST /tickets/purchase/
-    Request body:{
-                    "event_id": 1,
-                    "quantity": 2
-                }
-    Creates a PENDING order and returns a Paystack payment URL.
-    Tickets are not generated until payment is confirmed via webhook.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = PurchaseInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        from events.models import Event
-        event = get_object_or_404(Event, pk=serializer.validated_data["event_id"])
+        from events.models import TicketType
+        ticket_type = get_object_or_404(
+            TicketType.objects.select_related("event__created_by"),
+            pk=serializer.validated_data["ticket_type_id"],
+        )
 
-        if not event.created_by.paystack_subaccount_code:
+        if not ticket_type.event.created_by.paystack_subaccount_code:
             return Response(
                 {"detail": "This event is not available for purchase yet."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -59,19 +61,20 @@ class PurchaseTicketsView(APIView):
         try:
             order, payment_url = initiate_purchase(
                 user=request.user,
-                event=event,
+                ticket_type=ticket_type,
                 quantity=serializer.validated_data["quantity"],
             )
         except CapacityExceededError as exc:
             raise ValidationError({"detail": str(exc)})
         except InvalidQuantityError as exc:
             raise ValidationError({"detail": str(exc)})
+        except PurchaseLimitExceededError as exc:
+            raise ValidationError({"detail": str(exc)})
 
         return Response(
             {"order_id": str(order.id), "payment_url": payment_url},
             status=status.HTTP_201_CREATED,
         )
-
 
 class MyTicketsView(APIView):
     """

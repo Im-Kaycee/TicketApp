@@ -1,7 +1,10 @@
+from decimal import Decimal
 from django.db import transaction
 from .models import Order, OrderItem, Ticket
 from .qr import generate_qr_signature
 from .paystack import initialize_transaction
+
+MAX_TICKETS_PER_PURCHASE = 6
 
 
 class CapacityExceededError(Exception):
@@ -12,20 +15,29 @@ class InvalidQuantityError(Exception):
     pass
 
 
-def initiate_purchase(*, user, event, quantity: int):
+class PurchaseLimitExceededError(Exception):
+    pass
+
+
+def initiate_purchase(*, user, ticket_type, quantity: int):
     """
-    Phase 1 — validate capacity, create PENDING order, initialize Paystack payment.
-    Tickets are NOT generated yet. Returns the order and Paystack payment URL.
+    Phase 1 — validate capacity and purchase limit, create PENDING order,
+    initialize Paystack payment. Tickets are NOT generated yet.
     """
     if quantity < 1:
         raise InvalidQuantityError("Quantity must be at least 1.")
 
-    with transaction.atomic():
-        from events.models import Event as EventModel
-        event = EventModel.objects.select_for_update().get(pk=event.pk)
+    if quantity > MAX_TICKETS_PER_PURCHASE:
+        raise PurchaseLimitExceededError(
+            f"You cannot purchase more than {MAX_TICKETS_PER_PURCHASE} tickets at once."
+        )
 
-        tickets_sold = Ticket.objects.filter(
-            event=event,
+    with transaction.atomic():
+        from events.models import TicketType as TicketTypeModel
+        ticket_type = TicketTypeModel.objects.select_for_update().get(pk=ticket_type.pk)
+
+        sold = Ticket.objects.filter(
+            ticket_type=ticket_type,
             status__in=[
                 Ticket.Status.VALID,
                 Ticket.Status.CHECKED_IN,
@@ -33,27 +45,27 @@ def initiate_purchase(*, user, event, quantity: int):
             ],
         ).count()
 
-        available = event.capacity - tickets_sold
+        available = ticket_type.quantity - sold
         if quantity > available:
             raise CapacityExceededError(
-                f"Only {available} ticket(s) remaining for this event."
+                f"Only {available} ticket(s) remaining for {ticket_type.name}."
             )
 
         order = Order.objects.create(
             buyer=user,
-            event=event,
+            event=ticket_type.event,
+            ticket_type=ticket_type,
             quantity=quantity,
-            total_price=event.price * quantity,
+            total_price=ticket_type.price * quantity,
             status=Order.Status.PENDING,
         )
 
-    # Outside the transaction — no need to hold the DB lock during the API call
     payment_data = initialize_transaction(
         email=user.email,
         amount_naira=order.total_price,
         reference=order.id,
-        subaccount_code=event.created_by.paystack_subaccount_code,
-        platform_fee_percent=event.platform_fee_percent,
+        subaccount_code=ticket_type.event.created_by.paystack_subaccount_code,
+        platform_fee_percent=ticket_type.event.platform_fee_percent,
     )
 
     return order, payment_data["authorization_url"]
@@ -62,7 +74,7 @@ def initiate_purchase(*, user, event, quantity: int):
 def complete_purchase(*, order):
     """
     Phase 2 — called by the webhook after Paystack confirms payment.
-    This is where tickets are actually generated.
+    Generates tickets against the ticket type.
     """
     tickets = []
     order_items = []
@@ -70,6 +82,7 @@ def complete_purchase(*, order):
     for _ in range(order.quantity):
         ticket = Ticket(
             event=order.event,
+            ticket_type=order.ticket_type,
             owner=order.buyer,
             status=Ticket.Status.VALID,
         )
@@ -80,7 +93,11 @@ def complete_purchase(*, order):
 
     for ticket in tickets:
         order_items.append(
-            OrderItem(order=order, ticket=ticket, price=order.event.price)
+            OrderItem(
+                order=order,
+                ticket=ticket,
+                price=order.ticket_type.price,
+            )
         )
 
     OrderItem.objects.bulk_create(order_items)

@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',
+    'django_ratelimit',
     
 ]
 
@@ -206,3 +207,12 @@ SIMPLE_JWT = {
 }
 
 PAYSTACK_SECRET_KEY = env('PAYSTACK_SECRET_KEY')
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
