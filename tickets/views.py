@@ -34,6 +34,10 @@ from .services import (
 class PurchaseTicketsView(APIView):
     """
     POST /tickets/purchase/
+    Request body:{
+                    "event_id": 1,
+                    "quantity": 2
+                }
     Creates a PENDING order and returns a Paystack payment URL.
     Tickets are not generated until payment is confirmed via webhook.
     """
@@ -209,15 +213,14 @@ class CheckInView(APIView):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class PaystackWebhookView(APIView):
-    """
-    POST /tickets/payment/webhook/
-    Paystack calls this after a payment succeeds.
-    Verifies the signature, confirms the transaction, then generates tickets.
-    """
     permission_classes = []
 
     def post(self, request):
-        # Confirm the request is genuinely from Paystack
+        import hashlib
+        import hmac
+        import json
+        from django.conf import settings
+
         paystack_signature = request.headers.get("x-paystack-signature", "")
         computed = hmac.new(
             settings.PAYSTACK_SECRET_KEY.encode(),
@@ -229,26 +232,56 @@ class PaystackWebhookView(APIView):
             return Response({"detail": "Invalid signature."}, status=400)
 
         payload = json.loads(request.body)
-        event_type = payload.get("event")
 
-        if event_type != "charge.success":
-            # Acknowledge but ignore other event types
+        if payload.get("event") != "charge.success":
             return Response(status=200)
 
         reference = payload["data"]["reference"]
 
-        # Always verify independently — never trust the webhook payload alone
         from .paystack import verify_transaction
         transaction_data = verify_transaction(reference)
 
         if transaction_data["status"] != "success":
             return Response(status=200)
 
+        # Route based on reference prefix
+        if reference.startswith("resale_"):
+            return self._handle_resale(payload, reference)
+        else:
+            return self._handle_primary(reference)
+
+    def _handle_primary(self, reference):
+        """Handles primary ticket purchases."""
         try:
             order = Order.objects.get(id=reference, status=Order.Status.PENDING)
         except Order.DoesNotExist:
-            # Already processed or doesn't exist — acknowledge and move on
             return Response(status=200)
 
         complete_purchase(order=order)
+        return Response(status=200)
+
+    def _handle_resale(self, payload, reference):
+        """Handles marketplace resale purchases."""
+        from marketplace.models import MarketplaceListing
+        from marketplace.services import complete_resale_purchase
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        listing_id = reference.replace("resale_", "")
+
+        try:
+            listing = MarketplaceListing.objects.select_related(
+                "ticket", "seller"
+            ).get(id=listing_id, status=MarketplaceListing.Status.ACTIVE)
+        except MarketplaceListing.DoesNotExist:
+            return Response(status=200)
+
+        buyer_email = payload["data"]["customer"]["email"]
+        try:
+            buyer = User.objects.get(email=buyer_email)
+        except User.DoesNotExist:
+            return Response(status=200)
+
+        complete_resale_purchase(listing=listing, buyer=buyer)
         return Response(status=200)
