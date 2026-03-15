@@ -8,12 +8,7 @@ from django.db import transaction
 
 from accounts.models import User
 from .models import Event, EventRole, TicketType
-from .serializers import (
-    BulkTicketTypeSerializer,
-    EventCreationSerializer,
-    EventRoleSerializer,
-    TicketTypeSerializer,
-)
+from .serializers import *
 
 
 class EventCreateView(generics.CreateAPIView):
@@ -136,3 +131,81 @@ class EventStaffView(generics.ListAPIView):
         event_id = self.kwargs["event_id"]
         event = get_object_or_404(Event, id=event_id)
         return EventRole.objects.filter(event=event, role__in=["STAFF", "ORGANIZER"])
+    
+from rest_framework.pagination import PageNumberPagination
+from django.db.models import Q
+from django.utils import timezone
+
+
+class EventPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class EventDiscoveryView(generics.ListAPIView):
+    """
+    GET /events/
+    Public endpoint. Browse and search events with filters.
+
+    Query params:
+        search        — searches title and description
+        event_type    — ONLINE or OFFLINE
+        date_from     — ISO date string e.g. 2026-12-01
+        date_to       — ISO date string e.g. 2026-12-31
+        price_min     — minimum ticket price
+        price_max     — maximum ticket price
+        available     — true to only show events with tickets remaining
+        page          — page number
+        page_size     — results per page (max 100, default 20)
+    """
+    serializer_class = EventDiscoverySerializer
+    permission_classes = []
+    pagination_class = EventPagination
+
+    def get_queryset(self):
+        params = self.request.query_params
+        now = timezone.now()
+
+        queryset = (
+            Event.objects.filter(event_date__gte=now)
+            .prefetch_related("ticket_types")
+            .order_by("event_date")
+        )
+
+        # Search
+        search = params.get("search", "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(description__icontains=search)
+            )
+
+        # Event type filter
+        event_type = params.get("event_type", "").upper()
+        if event_type in ("ONLINE", "OFFLINE"):
+            queryset = queryset.filter(event_type=event_type)
+
+        # Date range filter
+        date_from = params.get("date_from")
+        date_to = params.get("date_to")
+        if date_from:
+            queryset = queryset.filter(event_date__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(event_date__date__lte=date_to)
+
+        # Price range filter — filter by ticket type prices
+        price_min = params.get("price_min")
+        price_max = params.get("price_max")
+        if price_min:
+            queryset = queryset.filter(ticket_types__price__gte=price_min)
+        if price_max:
+            queryset = queryset.filter(ticket_types__price__lte=price_max)
+
+        # Availability filter — only show events with tickets remaining
+        available = params.get("available", "").lower()
+        if available == "true":
+            queryset = [e for e in queryset if e.capacity > 0 and any(
+                tt.available() > 0 for tt in e.ticket_types.all()
+            )]
+
+        return queryset

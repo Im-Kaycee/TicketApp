@@ -26,18 +26,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-if ENVIRONMENT == 'development':
+'''if ENVIRONMENT == 'development':
     DEBUG = True
 else:
-    DEBUG = False
-
+    DEBUG = False'''
+DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
-FRONTEND_URL = env('FRONTEND_URL')
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:8080')
 # Password reset token expiration time (in seconds)
 # Default: 24 hours
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.resend.com'
+EMAIL_PORT = 465
+EMAIL_HOST_USER = 'resend'
+EMAIL_USE_SSL = True
+EMAIL_HOST_PASSWORD = env('RESEND_API_KEY')
+DEFAULT_FROM_EMAIL = "WAKA <no-reply@wakaapp.online>"
 # Application definition
 '''RESEND_API_KEY = env('RESEND_API_KEY')
 DEFAULT_FROM_EMAIL = "WAKA <no-reply@wakaapp.online>"
@@ -99,7 +105,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'TicketApp.wsgi.application'
 
-
+RESEND_API_KEY = env('RESEND_API_KEY')
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 

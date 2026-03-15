@@ -72,10 +72,10 @@ def initiate_purchase(*, user, ticket_type, quantity: int):
 
 
 def complete_purchase(*, order):
-    """
-    Phase 2 — called by the webhook after Paystack confirms payment.
-    Generates tickets against the ticket type.
-    """
+    from .emails import send_purchase_confirmation, send_organizer_sale_alert
+    import logging
+    logger = logging.getLogger(__name__)
+
     tickets = []
     order_items = []
 
@@ -104,3 +104,9 @@ def complete_purchase(*, order):
 
     order.status = Order.Status.COMPLETED
     order.save(update_fields=["status"])
+
+    try:
+        send_purchase_confirmation(order)
+        send_organizer_sale_alert(order)
+    except Exception as e:
+        logger.error(f"Email failed: {e}", exc_info=True)

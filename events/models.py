@@ -10,6 +10,7 @@ class Event(models.Model):
     description = models.TextField()
     venue = models.CharField(max_length=255, blank=True)
     online_link = models.URLField(blank=True)
+    image_url = models.URLField(blank=True)
     event_type = models.CharField(
         max_length=10,
         choices=EventType.choices,

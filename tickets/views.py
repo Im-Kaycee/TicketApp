@@ -30,7 +30,8 @@ from .services import (
     complete_purchase,
     initiate_purchase,
 )
-
+from datetime import timedelta
+from .emails import send_checkin_confirmation
 
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
@@ -164,7 +165,7 @@ class CheckInView(APIView):
 
     def post(self, request, ticket_id):
         ticket = get_object_or_404(
-            Ticket.objects.select_related("event"), pk=ticket_id
+            Ticket.objects.select_related("event", "owner", "ticket_type"), pk=ticket_id
         )
 
         event_end = ticket.event.event_date + timedelta(hours=ticket.event.duration_hours)
@@ -191,6 +192,11 @@ class CheckInView(APIView):
         ticket.status = Ticket.Status.CHECKED_IN
         ticket.save(update_fields=["status"])
         CheckInLog.objects.create(ticket=ticket, scanned_by=request.user)
+
+        try:
+            send_checkin_confirmation(ticket, scanned_by=request.user)
+        except Exception:
+            pass
 
         return Response(
             {

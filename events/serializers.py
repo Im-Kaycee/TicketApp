@@ -52,6 +52,7 @@ class EventCreationSerializer(serializers.ModelSerializer):
             "venue",
             "online_link",
             "event_type",
+            "image_url",
             "event_date",
             "duration_hours",
             "platform_fee_percent",
@@ -84,3 +85,34 @@ class EventRoleSerializer(serializers.ModelSerializer):
         model = EventRole
         fields = ["id", "user", "event", "role", "assigned_at"]
         read_only_fields = ["id", "user", "event", "assigned_at"]
+    
+class EventDiscoverySerializer(serializers.ModelSerializer):
+    ticket_types = TicketTypeSerializer(many=True, read_only=True)
+    created_by = serializers.CharField(source="created_by.username", read_only=True)
+    is_sold_out = serializers.SerializerMethodField()
+    lowest_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "title",
+            "description",
+            "image_url",
+            "venue",
+            "online_link",
+            "event_type",
+            "event_date",
+            "duration_hours",
+            "created_by",
+            "ticket_types",
+            "is_sold_out",
+            "lowest_price",
+        ]
+
+    def get_is_sold_out(self, obj):
+        return all(tt.available() <= 0 for tt in obj.ticket_types.all())
+
+    def get_lowest_price(self, obj):
+        prices = [tt.price for tt in obj.ticket_types.all() if tt.available() > 0]
+        return min(prices) if prices else None
