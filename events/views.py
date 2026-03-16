@@ -12,6 +12,11 @@ from .serializers import *
 from django.db.models import Sum, Count
 from django.utils import timezone
 from tickets.models import Ticket, Order, CheckInLog
+import os
+import uuid
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from rest_framework.exceptions import ValidationError
 
 class EventCreateView(generics.CreateAPIView):
     queryset = Event.objects.all()
@@ -23,11 +28,27 @@ class EventCreateView(generics.CreateAPIView):
             raise PermissionDenied(
                 "You must complete bank account onboarding before creating an event."
             )
-        event = serializer.save(created_by=self.request.user)
-        EventRole.objects.create(
-            user=self.request.user, event=event, role="ORGANIZER"
-        )
 
+        image_url = ''
+        image_file = self.request.FILES.get('image')
+
+        if image_file:
+            allowed_types = ['image/jpeg', 'image/png', 'image/webp']
+            if image_file.content_type not in allowed_types:
+                raise ValidationError({"image": "Only JPEG, PNG and WebP images are allowed."})
+            if image_file.size > 5 * 1024 * 1024:
+                raise ValidationError({"image": "Image must be under 5MB."})
+
+            ext = os.path.splitext(image_file.name)[1].lower()
+            filename = f"events/{uuid.uuid4().hex}{ext}"
+            path = default_storage.save(filename, ContentFile(image_file.read()))
+            image_url = self.request.build_absolute_uri(f"/media/{path}")
+
+        event = serializer.save(
+            created_by=self.request.user,
+            image_url=image_url,
+        )
+        EventRole.objects.create(user=self.request.user, event=event, role='ORGANIZER')
 
 class AddTicketTypeView(APIView):
     """
@@ -433,7 +454,10 @@ class EventDashboardAttendanceView(APIView):
             "recent_checkins": checkin_data,
         })
 
-
+class EventDetailView(generics.RetrieveAPIView):
+    queryset = Event.objects.prefetch_related('ticket_types').all()
+    serializer_class = EventDiscoverySerializer
+    permission_classes = []
 class OrganizerOverviewView(EventDashboardMixin, APIView):
     """
     GET /events/dashboard/overview/

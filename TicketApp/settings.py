@@ -33,7 +33,7 @@ else:
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:8080')
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 # Password reset token expiration time (in seconds)
 # Default: 24 hours
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24

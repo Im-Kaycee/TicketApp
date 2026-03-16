@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from urllib3 import request
 
 from tickets.models import Ticket
 from .models import MarketplaceListing
@@ -50,12 +51,16 @@ class CreateListingView(APIView):
     def post(self, request):
         serializer = CreateListingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
+        
+        print("DATA:", serializer.validated_data)  # add this
+        
         ticket = get_object_or_404(
             Ticket.objects.select_related("event"),
             pk=serializer.validated_data["ticket_id"],
         )
-
+        
+        print("TICKET:", ticket, "OWNER:", ticket.owner, "REQUEST USER:", request.user)  # add this
+        
         try:
             listing = create_listing(
                 seller=request.user,
@@ -68,13 +73,23 @@ class CreateListingView(APIView):
             raise ValidationError({"detail": str(exc)})
         except Exception as exc:
             raise ValidationError({"detail": str(exc)})
-
         return Response(
-            MarketplaceListingSerializer(listing).data,
-            status=status.HTTP_201_CREATED,
+        MarketplaceListingSerializer(listing).data,
+        status=status.HTTP_201_CREATED,
+            )
+
+class MarketplaceListingDetailView(APIView):
+    permission_classes = []
+
+    def get(self, request, listing_id):
+        listing = get_object_or_404(
+            MarketplaceListing.objects.select_related(
+                "ticket__event", "ticket__ticket_type", "seller"
+            ),
+            pk=listing_id,
+            status=MarketplaceListing.Status.ACTIVE,
         )
-
-
+        return Response(MarketplaceListingSerializer(listing).data)
 class CancelListingView(APIView):
     """
     POST /marketplace/<listing_id>/cancel/

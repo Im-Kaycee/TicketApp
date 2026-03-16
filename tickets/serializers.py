@@ -15,6 +15,7 @@ class TicketSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True,
     )
+    event_date = serializers.DateTimeField(source="event.event_date", read_only=True)  #
 
     class Meta:
         model = Ticket
@@ -23,6 +24,7 @@ class TicketSerializer(serializers.ModelSerializer):
             "event",
             "event_name",
             "event_type",
+            "event_date",
             "online_link",
             "ticket_type",
             "ticket_type_name",

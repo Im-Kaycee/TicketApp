@@ -21,7 +21,7 @@ class TicketTypeSerializer(serializers.ModelSerializer):
 class TicketTypeInputSerializer(serializers.Serializer):
     """Used for creating ticket types — no read-only fields."""
     name = serializers.CharField(max_length=100)
-    price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=1.00)
     quantity = serializers.IntegerField(min_value=1)
 
 

@@ -3,6 +3,7 @@ from tickets.models import Ticket
 from tickets.validators import assert_ticket_listable
 from tickets.paystack import initialize_transaction
 from .models import MarketplaceListing
+from decimal import Decimal
 
 RESALE_PRICE_CAP_PERCENT = 130
 PLATFORM_FEE_PERCENT = 10
@@ -19,23 +20,15 @@ class PriceCapExceededError(Exception):
 class SellerBuyingOwnListingError(Exception):
     pass
 
-
+RESALE_PRICE_CAP_PERCENT = Decimal("130")
+PLATFORM_FEE_PERCENT = Decimal("10")
 def create_listing(*, seller, ticket, price):
-    """
-    List a ticket for resale.
-    Validates ticket is eligible, checks price cap, updates ticket status.
-    """
-    # Confirm ticket belongs to seller
     if ticket.owner != seller:
         raise PermissionError("You do not own this ticket.")
 
-    # Use the validator from the tickets app
     assert_ticket_listable(ticket)
 
-    # Enforce 130% price cap
-    from decimal import Decimal
-
-    max_price = ticket.event.price * (Decimal(RESALE_PRICE_CAP_PERCENT) / Decimal(100))
+    max_price = ticket.ticket_type.price * (RESALE_PRICE_CAP_PERCENT / 100)
     if price > max_price:
         raise PriceCapExceededError(
             f"Listing price cannot exceed NGN {max_price:.2f} "

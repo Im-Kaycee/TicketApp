@@ -60,6 +60,7 @@ def initialize_transaction(*, email, amount_naira, reference, subaccount_code, p
         "subaccount": subaccount_code,
         "bearer": "account",
         "transaction_charge": int(amount_kobo * (platform_fee_percent / 100)),
+        "callback_url": f"{settings.FRONTEND_URL}/payment/callback",
     }
 
     response = requests.post(

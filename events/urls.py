@@ -3,6 +3,7 @@ from .views import *
 urlpatterns = [
     path("", EventDiscoveryView.as_view(), name="event-discovery"),
     path("create/", EventCreateView.as_view(), name="event-create"),
+    path('<int:pk>/', EventDetailView.as_view(), name='event-detail'),
     path("dashboard/overview/", OrganizerOverviewView.as_view(), name="organizer-overview"),
     path("<int:event_id>/ticket-types/", AddTicketTypeView.as_view(), name="add-ticket-type"),
     path("<int:event_id>/add-staff/<int:user_id>/", AddStaffView.as_view(), name="add-staff"),

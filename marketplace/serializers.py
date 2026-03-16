@@ -8,11 +8,11 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
     event_date = serializers.DateTimeField(source="ticket.event.event_date", read_only=True)
     seller_name = serializers.CharField(source="seller.username", read_only=True)
     original_price = serializers.DecimalField(
-        source="ticket.event.price",
-        max_digits=10,
-        decimal_places=2,
-        read_only=True,
-    )
+    source="ticket.ticket_type.price",
+    max_digits=10,
+    decimal_places=2,
+    read_only=True,
+)
 
     class Meta:
         model = MarketplaceListing
