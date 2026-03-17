@@ -78,13 +78,14 @@ class EventCreationSerializer(serializers.ModelSerializer):
 
 
 class EventRoleSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source="user.username", read_only=True)
-    event = serializers.CharField(source="event.title", read_only=True)
+    user = serializers.CharField(source='user.username', read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    event = serializers.CharField(source='event.title', read_only=True)
 
     class Meta:
         model = EventRole
-        fields = ["id", "user", "event", "role", "assigned_at"]
-        read_only_fields = ["id", "user", "event", "assigned_at"]
+        fields = ['id', 'user', 'user_id', 'event', 'role', 'assigned_at']
+        read_only_fields = ['id', 'user', 'user_id', 'event', 'assigned_at']
     
 class EventDiscoverySerializer(serializers.ModelSerializer):
     ticket_types = TicketTypeSerializer(many=True, read_only=True)

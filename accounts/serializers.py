@@ -106,3 +106,19 @@ class OnboardingSerializer(serializers.Serializer):
         ])
 
         return user
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = ['first_name', 'last_name', 'email', 'username']
+
+    def validate_username(self, value):
+        user = self.instance
+        if get_user_model().objects.exclude(pk=user.pk).filter(username=value).exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return value
+
+    def validate_email(self, value):
+        user = self.instance
+        if get_user_model().objects.exclude(pk=user.pk).filter(email=value).exists():
+            raise serializers.ValidationError("This email is already in use.")
+        return value

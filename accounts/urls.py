@@ -9,8 +9,10 @@ urlpatterns = [
     path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('register/', RegisterView.as_view(), name = 'register'),
+    path('profile/', UpdateProfileView.as_view(), name='update-profile'),
     path("me/", UserDetailView.as_view(), name="user-detail"),
     path('change-password/', ChangePasswordView.as_view(), name='change_password'),
     path("banks/", BankListView.as_view(), name="bank-list"),
     path("onboarding/", OnboardingView.as_view(), name="onboarding"),
+    path('find-user/', FindUserView.as_view(), name='find-user'),
 ]

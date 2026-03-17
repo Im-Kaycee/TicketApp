@@ -79,3 +79,31 @@ class OnboardingView(APIView):
             {"detail": "Bank account registered successfully."},
             status=status.HTTP_201_CREATED,
         )
+class UpdateProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        serializer = UpdateProfileSerializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(user).data)
+from django.contrib.auth import get_user_model
+class FindUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        username = request.query_params.get('username', '').strip()
+        if not username:
+            return Response(
+                {"detail": "Username is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            user = get_user_model().objects.get(username=username)
+            return Response({"id": user.id, "username": user.username})
+        except get_user_model().DoesNotExist:
+            return Response(
+                {"detail": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )

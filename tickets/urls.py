@@ -15,4 +15,5 @@ urlpatterns = [
     path("payment/webhook/", PaystackWebhookView.as_view(), name="paystack-webhook"),
     path("<uuid:ticket_id>/", TicketDetailView.as_view(), name="ticket-detail"),
     path("<uuid:ticket_id>/checkin/", CheckInView.as_view(), name="ticket-checkin"),
+    
 ]
