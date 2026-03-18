@@ -20,7 +20,7 @@ class Event(models.Model):
     event_date = models.DateTimeField()
     duration_hours = models.PositiveIntegerField(default=4)
     platform_fee_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, default=5.00
+        max_digits=5, decimal_places=2, default=8.00
     )
     created_by = models.ForeignKey(
         "accounts.User",

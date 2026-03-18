@@ -26,6 +26,11 @@ def create_listing(*, seller, ticket, price):
     if ticket.owner != seller:
         raise PermissionError("You do not own this ticket.")
 
+    if not seller.paystack_subaccount_code:
+        raise PermissionError(
+            "You must complete bank account onboarding before listing a ticket for sale."
+        )
+
     assert_ticket_listable(ticket)
 
     max_price = ticket.ticket_type.price * (RESALE_PRICE_CAP_PERCENT / 100)

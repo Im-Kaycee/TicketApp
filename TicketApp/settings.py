@@ -34,6 +34,21 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://lucky-starfish.outray.app/",
+    "http://localhost:3000/",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://lucky-starfish.outray.app/","http://localhost:3000/",
+]
+
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
 # Password reset token expiration time (in seconds)
 # Default: 24 hours
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
